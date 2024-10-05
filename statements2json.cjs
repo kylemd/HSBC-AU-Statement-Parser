@@ -1,5 +1,8 @@
-import fs from "fs";
-import PDFParser from "pdf2json";
+const fs = require("fs");
+const PDFParser = require("pdf2json");
+
+// import fs from "fs";
+// import PDFParser from "pdf2json";
 
 var folderPath = ".\\test statements\\";
 
@@ -8,6 +11,7 @@ const files = fs.readdirSync(folderPath);
 // All of the parse statements
 let statements = [];
 
+// Define custom function parse date field in metadata
 const metadataDateStringToDate = (x) => {
   return Date.parse(x.substring(0, 10));
 };

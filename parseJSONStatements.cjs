@@ -1,9 +1,9 @@
 const fs = require("fs");
-const { Transform } = require("stream");
 const writeXlsxFile = require("write-excel-file/node");
 
-const filePath = "statements.json";
-const jsonFile = fs.readFileSync(filePath);
+const sourcefilePath = "statements.json";
+const destFilePath = ".\\statements.xlsx";
+const jsonFile = fs.readFileSync(sourcefilePath);
 const jsonObj = JSON.parse(jsonFile);
 const pageUnitsScale = 0.0625038430794052; // scaling factor for text box width added to x position
 const minRowSpacing = 0.9; // min increase in y position to count as a new table row
@@ -17,13 +17,13 @@ const decRound = (num, decimals) => {
   return Math.round(num * scalar) / scalar;
 };
 
-const getParentDictByValue = (obj, val) => {
+const getParentKeybyValue = (obj, val) => {
   if (typeof obj === "object") {
     for (const key in obj) {
       if (obj[key] === val) {
         return key;
       } else {
-        const result = getParentDictByValue(obj[key], val);
+        const result = getParentKeybyValue(obj[key], val);
         if (result !== null) return obj[key];
       }
     }
@@ -35,11 +35,6 @@ const getParentDictByValue = (obj, val) => {
 function getKeyByValue(object, value) {
   return Object.keys(object).find((key) => object[key] === value);
 }
-
-// Define custom function parse date field in metadata
-const metadataDateStringToDate = (x) => {
-  return Date.parse(x.substring(0, 10));
-};
 
 // Define custom function to get statement period
 const getStatementPeriod = (statement) => {
@@ -62,13 +57,6 @@ var row = -1;
 var currentStatement = 0;
 var maxYonRow = 0;
 
-// jsonObj.sort((a, b) => {
-//   return (
-//     metadataDateStringToDate(a.Meta.Metadata["xmp:metadatadate"]) -
-//     metadataDateStringToDate(b.Meta.Metadata["xmp:metadatadate"])
-//   );
-// });
-
 var statementPeriodTextY = -1;
 
 for (const statement of jsonObj) {
@@ -76,9 +64,7 @@ for (const statement of jsonObj) {
   console.log(statement.Meta.Metadata["xmp:metadatadate"]);
   for (const page of statement.Pages) {
     for (const textBox of page.Texts) {
-      // TODO: Save current statement period to correctly assign years that are missing in date column
       if (textBox.R[0].T.includes(encodeURIComponent("STATEMENT PERIOD"))) {
-        // statementPeriodRef = textBox;
         statementPeriodTextY = textBox.y;
       } else if (textBox.y === statementPeriodTextY) {
         if (Date.parse(decodeURIComponent(textBox.R[0].T))) {
@@ -98,7 +84,7 @@ for (const statement of jsonObj) {
       }
 
       if (
-        getParentDictByValue(
+        getParentKeybyValue(
           statementColumnsXDict,
           decRound(
             textBox.x +
@@ -147,7 +133,7 @@ transactionData.forEach((transactionItem, i, arr) => {
     currentStatement = decodeURIComponent(transactionItem.R[0].T);
     return;
   } else {
-    colObject = getParentDictByValue(
+    colObject = getParentKeybyValue(
       statementColumnsXDict,
       decRound(
         transactionItem.x +
@@ -248,7 +234,7 @@ writeXlsxFile(excelData, {
   fontSize: 11,
   fontFamily: "Aptos Narrow (Body)",
   sheets: accountNumbers,
-  filePath: ".\\statements.xlsx",
+  filePath: destFilePath,
 });
 
 // function writeToCSVFile(data, filename, headers = []) {
