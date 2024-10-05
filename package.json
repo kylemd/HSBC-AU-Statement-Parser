@@ -1,0 +1,11 @@
+{
+  "name": "parser3",
+  "version": "0.0.1",
+  "type": "module",
+  "dependencies": {
+    "hsbc-statement-parser": "0.1.2",
+    "pdf2json": "^3.1.4",
+    "stream": "^0.0.3",
+    "write-excel-file": "^2.0.10"
+  }
+}
