@@ -17,6 +17,7 @@ const decRound = (num, decimals) => {
   return Math.round(num * scalar) / scalar;
 };
 
+// Define custom function to get Parent key in dict by value
 const getParentKeybyValue = (obj, val) => {
   if (typeof obj === "object") {
     for (const key in obj) {
@@ -32,14 +33,12 @@ const getParentKeybyValue = (obj, val) => {
 };
 
 // Define custom function to get key in dict by value
-function getKeyByValue(object, value) {
+const getKeyByValue = (object, value) => {
   return Object.keys(object).find((key) => object[key] === value);
-}
-
-// Define custom function to get statement period
-const getStatementPeriod = (statement) => {
-  d = statement.Meta.Metadata["xmp:metadatadate"].substring(0, 10).split("-");
 };
+
+// Deifne custom funtion to get unique column values
+const uniqueCol = (arr, col) => [...new Set(arr.map((row) => row[col]))];
 
 // Define where each column starts in PDF statements
 const statementColumnsXDict = {
@@ -53,22 +52,22 @@ const statementColumnsXDict = {
 };
 
 let transactionData = [];
-var row = -1;
-var currentStatement = 0;
-var maxYonRow = 0;
-
-var statementPeriodTextY = -1;
+let row = -1;
+let currentStatement = 0;
+let maxYonRow = 0;
+let statementPeriodTextY = -1;
 
 for (const statement of jsonObj) {
-  var statementPeriod = { start: 0, end: 0 };
-  console.log(statement.Meta.Metadata["xmp:metadatadate"]);
+  let statementPeriod = { start: 0, end: 0 };
+  console.log(`Parsing: ${statement.Meta.Metadata["xmp:metadatadate"]}`);
   for (const page of statement.Pages) {
     for (const textBox of page.Texts) {
-      if (textBox.R[0].T.includes(encodeURIComponent("STATEMENT PERIOD"))) {
+      const decodedText = decodeURIComponent(textBox.R[0].T);
+      if (decodedText.includes("STATEMENT PERIOD")) {
         statementPeriodTextY = textBox.y;
       } else if (textBox.y === statementPeriodTextY) {
-        if (Date.parse(decodeURIComponent(textBox.R[0].T))) {
-          let d = new Date(decodeURIComponent(textBox.R[0].T));
+        if (Date.parse(decodedText)) {
+          let d = new Date(decodedText);
           if (statementPeriod.start === 0) {
             statementPeriod.start = d;
           } else {
@@ -83,17 +82,16 @@ for (const statement of jsonObj) {
         transactionData.push(textBox);
       }
 
+      const adjustedX = decRound(
+        textBox.x +
+          (textBox.x > statementColumnsXDict.transactionDetails.x + 1
+            ? textBox.w * pageUnitsScale
+            : 0),
+        2
+      );
+
       if (
-        getParentKeybyValue(
-          statementColumnsXDict,
-          decRound(
-            textBox.x +
-              (textBox.x > statementColumnsXDict.transactionDetails.x + 1
-                ? textBox.w * pageUnitsScale
-                : 0),
-            2
-          )
-        ) &&
+        getParentKeybyValue(statementColumnsXDict, adjustedX) &&
         textBox.R[0].TS[2] !== 1 &&
         !("oc" in textBox)
       ) {
@@ -104,6 +102,7 @@ for (const statement of jsonObj) {
     statementPeriodTextY = -1;
   }
 }
+
 var transactionTableArray = Array.from({ length: transactionData.length }, () =>
   Array(5).fill(null)
 );
@@ -111,58 +110,70 @@ var transactionTableArray = Array.from({ length: transactionData.length }, () =>
 var statementPeriod = { start: 0, end: 0 };
 
 transactionData.forEach((transactionItem, i, arr) => {
-  var col = 0;
-  var colObject = null;
+  // var col = 0;
+  // var colObject = null;
   if (transactionItem === "ENDPAGE") {
     row++;
     maxYonRow = 0;
     return;
   }
+
   if ("start" in transactionItem && "end" in transactionItem) {
     statementPeriod.start = transactionItem.start;
     statementPeriod.end = transactionItem.end;
     return;
   }
+
   if (i !== 0 && transactionItem.y - maxYonRow > minRowSpacing) {
     row++;
     maxYonRow = 0;
     transactionTableArray[row][statementColumnsXDict.accountNumber.col] =
       currentStatement;
   }
+
   if (transactionItem.x === statementColumnsXDict.accountNumber.x) {
     currentStatement = decodeURIComponent(transactionItem.R[0].T);
     return;
-  } else {
-    colObject = getParentKeybyValue(
-      statementColumnsXDict,
-      decRound(
-        transactionItem.x +
-          (transactionItem.x > statementColumnsXDict.transactionDetails.x + 1
-            ? transactionItem.w * pageUnitsScale
-            : 0),
-        2
-      )
-    );
-    col = colObject.col;
+  }
+
+  const adjustedX = decRound(
+    transactionItem.x +
+      (transactionItem.x > statementColumnsXDict.transactionDetails.x + 1
+        ? transactionItem.w * pageUnitsScale
+        : 0),
+    2
+  );
+
+  const colObject = getParentKeybyValue(statementColumnsXDict, adjustedX);
+  const col = colObject ? colObject.col : null;
+
+  if (col !== null) {
     colKey = getKeyByValue(statementColumnsXDict, colObject);
     maxYonRow = Math.max(maxYonRow, transactionItem.y);
-  }
+    let itemValue = decodeURIComponent(transactionItem.R[0].T).replace(",", "");
 
-  var itemValue = decodeURIComponent(transactionItem.R[0].T).replace(",", "");
-  if (colKey === "date" && Date.parse([itemValue, 1900].join(" "))) {
-    let d = [itemValue, statementPeriod.end.getFullYear()].join(" ");
-    if (d <= statementPeriod.end) {
-      itemValue = d;
-    } else {
-      itemValue = [itemValue, statementPeriod.end.getFullYear()].join(" ");
+    if (colKey === "date" && Date.parse([itemValue, 1900].join(" "))) {
+      const d = [itemValue, statementPeriod.end.getFullYear()].join(" ");
+      // if (d <= statementPeriod.end) {
+      //   itemValue = d;
+      // } else {
+      //   itemValue = [itemValue, statementPeriod.end.getFullYear()].join(" ");
+      // }
+      itemValue =
+        d <= statementPeriod.end
+          ? d
+          : [itemValue, statementPeriod.end.getFullYear()].join(" ");
+    } else if (colKey === "debits") {
+      itemValue = parseFloat(itemValue) * -1;
     }
-  } else if (colKey === "debits") {
-    itemValue = parseFloat(itemValue) * -1;
-  }
 
-  transactionTableArray[row][col] = [transactionTableArray[row][col], itemValue]
-    .join(" ")
-    .trim();
+    transactionTableArray[row][col] = [
+      transactionTableArray[row][col],
+      itemValue,
+    ]
+      .join(" ")
+      .trim();
+  }
 });
 
 var transactionTableArray = transactionTableArray.filter(
@@ -182,26 +193,12 @@ transactionTableArray.forEach((transaction, i, arr) => {
   }
 });
 
-var excelData = [];
-
-const uniqueCol = (arr, col) => {
-  let a = [];
-  let c = arr.map((v, i) => {
-    return v[col];
-  });
-  c.forEach((num) => {
-    if (!a.includes(num)) {
-      a.push(num);
-    }
-  });
-  return a;
-};
-
+const excelData = [];
 const accountNumbers = uniqueCol(transactionTableArray, 0);
 
 accountNumbers.forEach((account) => {
   let excelSheetArr = transactionTableArray.filter((row) => row[0] === account);
-  excelSheetArr.forEach((transaction, i, arr) => {
+  excelSheetArr.forEach((transaction) => {
     transaction[0] = {
       type: String,
       value: transaction[0],
@@ -232,10 +229,12 @@ accountNumbers.forEach((account) => {
 
 writeXlsxFile(excelData, {
   fontSize: 11,
-  fontFamily: "Aptos Narrow (Body)",
+  fontFamily: "Aptos Narrow",
   sheets: accountNumbers,
   filePath: destFilePath,
 });
+
+console.log("Parsing complete");
 
 // function writeToCSVFile(data, filename, headers = []) {
 //   return new Promise((resolve, reject) => {
