@@ -3,6 +3,7 @@ import path from "path";
 import PDFParser from "pdf2json";
 import writeXlsxFile from "write-excel-file/node";
 import readline from "readline";
+import moment from "moment";
 
 // Define exportable function to convert PDF statements to JSON
 const statementsPDFtoJSON = async (sourceFolderPath) => {
@@ -60,7 +61,7 @@ const statementsPDFtoJSON = async (sourceFolderPath) => {
       2
     );
   } catch (error) {
-    console.error("Error processing PDF statements:", error);
+    console.error("Error processing PDF statements:\n", error);
   }
 };
 
@@ -268,7 +269,9 @@ const statementsJSONtoXLSX = (jsonFile, outputFilePath) => {
       };
       transaction[1] = {
         type: Date,
-        value: new Date(transaction[1]),
+        // Excel has no concept of time zones, so must treat current date/time
+        // as UTC+00 regardless of user locale
+        value: new Date(moment.utc(transaction[1], "DD MMM YYYY").toString()),
         format: "dd-mmm-yy",
       };
       transaction[2] = {
@@ -282,7 +285,7 @@ const statementsJSONtoXLSX = (jsonFile, outputFilePath) => {
       };
     });
     excelSheetArr.splice(0, 0, [
-      // { type: String, value: "Account No." },
+      { type: String, value: "Account No." },
       { type: String, value: "Date" },
       { type: String, value: "Transaction Details" },
       { type: String, value: "Transaction Amount" },

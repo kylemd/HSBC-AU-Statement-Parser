@@ -3,12 +3,12 @@
   "version": "0.2",
   "type": "module",
   "dependencies": {
+    "moment": "^2.30.1",
     "pdf2json": "^3.1.4",
     "write-excel-file": "^2.0.10"
   },
   "description": "HSBC Australia Statement Parser is a CLI tool that leverages the [pdf2json](https://github.com/modesty/pdf2json) node.js module to parse transaction data from PDFs.\r This tool currently works on HSBC Australia debit-like account statements (home loans, offset accounts, etc).  \r\r This tool **DOES NOT**  work for credit card statements.  \r\r I do not have HSBC statements from other regions to test against, so your mileage may vary.",
   "main": "index.mjs",
-  "devDependencies": {},
   "scripts": {
     "test": ""
   },
@@ -18,6 +18,7 @@
   },
   "keywords": [
     "HSBC",
+    "bank",
     "statements",
     "pdf",
     "json"
