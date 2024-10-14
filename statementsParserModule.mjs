@@ -221,7 +221,7 @@ const statementsJSONtoXLSX = (jsonFile, outputFilePath) => {
         itemValue =
           d <= statementPeriod.end
             ? d
-            : [itemValue, statementPeriod.end.getFullYear()].join(" ");
+            : [itemValue, statementPeriod.start.getFullYear()].join(" ");
       } else if (colKey === "debits") {
         itemValue = parseFloat(itemValue) * -1;
       }
