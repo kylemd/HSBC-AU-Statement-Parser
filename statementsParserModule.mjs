@@ -72,7 +72,7 @@ const statementsJSONtoXLSX = (jsonFile, outputFilePath) => {
 
   console.log("Parsing JSON...");
 
-  // Define custom rouding function to X decimal places
+  // Define custom rounding function to X decimal places
   const decRound = (num, decimals) => {
     if (!Number.isInteger(decimals) || decimals < 0) {
       return null;
@@ -101,7 +101,7 @@ const statementsJSONtoXLSX = (jsonFile, outputFilePath) => {
     return Object.keys(object).find((key) => object[key] === value);
   };
 
-  // Deifne custom funtion to get unique column values
+  // Define custom function to get unique column values
   const uniqueCol = (arr, col) => [...new Set(arr.map((row) => row[col]))];
 
   // Define where each column starts in PDF statements
@@ -120,18 +120,23 @@ const statementsJSONtoXLSX = (jsonFile, outputFilePath) => {
   let currentStatement = 0;
   let maxYonRow = 0;
   let statementPeriodTextY = -1;
+  let statementPeriod = { start: 0, end: 0 };
+  let edgeCaseDetected = false;
 
   for (const statement of jsonObj) {
-    let statementPeriod = { start: 0, end: 0 };
     for (const page of statement.Pages) {
       for (const textBox of page.Texts) {
         const decodedText = decodeURIComponent(textBox.R[0].T);
         if (decodedText.includes("STATEMENT PERIOD")) {
           statementPeriodTextY = textBox.y;
+          edgeCaseDetected = decodedText.includes("TO") && !decodedText.includes("FROM");
         } else if (textBox.y === statementPeriodTextY) {
           if (Date.parse(decodedText)) {
             let d = new Date(decodedText);
-            if (statementPeriod.start === 0) {
+            if (edgeCaseDetected) {
+              statementPeriod.end = d;
+              edgeCaseDetected = false;
+            } else if (statementPeriod.start === 0) {
               statementPeriod.start = d;
             } else {
               statementPeriod.end = d;
@@ -164,14 +169,14 @@ const statementsJSONtoXLSX = (jsonFile, outputFilePath) => {
       transactionData.push("ENDPAGE");
       statementPeriodTextY = -1;
     }
+    // Reset edgeCaseDetected after processing each PDF file
+    edgeCaseDetected = false;
   }
 
   var transactionTableArray = Array.from(
     { length: transactionData.length },
     () => Array(5).fill(null)
   );
-
-  var statementPeriod = { start: 0, end: 0 };
 
   transactionData.forEach((transactionItem, i, arr) => {
     if (transactionItem === "ENDPAGE") {
@@ -219,8 +224,9 @@ const statementsJSONtoXLSX = (jsonFile, outputFilePath) => {
 
       if (colKey === "date" && Date.parse([itemValue, 1900].join(" "))) {
         const d = [itemValue, statementPeriod.end.getFullYear()].join(" ");
+        const parsedDate = new Date(d);
         itemValue =
-          d <= statementPeriod.end
+          parsedDate >= statementPeriod.start && parsedDate <= statementPeriod.end
             ? d
             : [itemValue, statementPeriod.start.getFullYear()].join(" ");
       } else if (colKey === "debits") {
